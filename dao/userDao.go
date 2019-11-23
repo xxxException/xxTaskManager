@@ -64,42 +64,43 @@ func (dao *UserDao) InsertUser(user *dataModel.User, roleId int, departmentId in
 	return session.Commit()
 }
 
-func (dao *UserDao) DeleteUser(user *dataModel.User) error {
+func (dao *UserDao) DeleteUser(users []*dataModel.User) error {
 	var session = dao.EngineGroup.NewSession()
 	defer session.Close()
 
 	var err error
 	//受影响行数
 	var affected int64
+	for _, user := range users {
+		affected, err = session.ID(user.Id).Delete(user)
+		if err != nil {
+			_ = session.Rollback()
+			return errors.New("Error number of user deleted->" + err.Error())
+		}
+		if affected != 1 {
+			_ = session.Rollback()
+			return errors.New("Error number of user deleted-> expected: 1 , actual: " + string(affected))
+		}
 
-	affected, err = session.ID(user.Id).Delete(user)
-	if err != nil {
-		_ = session.Rollback()
-		return errors.New("Error number of user deleted->" + err.Error())
-	}
-	if affected != 1 {
-		_ = session.Rollback()
-		return errors.New("Error number of user deleted-> expected: 1 , actual: " + string(affected))
-	}
+		affected, err = session.Delete(&dataModel.UserRole{UserId: user.Id})
+		if err != nil {
+			_ = session.Rollback()
+			return errors.New("delete user'department fail -> " + err.Error())
+		}
+		if affected != 1 {
+			_ = session.Rollback()
+			return errors.New("delete user'role fail, error number of user_role deleted-> expected: 1 , actual: " + string(affected))
+		}
 
-	affected, err = session.Delete(&dataModel.UserRole{UserId: user.Id})
-	if err != nil {
-		_ = session.Rollback()
-		return errors.New("delete user'department fail -> " + err.Error())
-	}
-	if affected != 1 {
-		_ = session.Rollback()
-		return errors.New("delete user'role fail, error number of user_role deleted-> expected: 1 , actual: " + string(affected))
-	}
-
-	affected, err = session.Delete(&dataModel.UserDepartment{UserId: user.Id})
-	if err != nil {
-		_ = session.Rollback()
-		return errors.New("delete user'department fail -> " + err.Error())
-	}
-	if affected != 1 {
-		_ = session.Rollback()
-		return errors.New("delete user'department fail, error number of user_role deleted-> expected: 1 , actual: " + string(affected))
+		affected, err = session.Delete(&dataModel.UserDepartment{UserId: user.Id})
+		if err != nil {
+			_ = session.Rollback()
+			return errors.New("delete user'department fail -> " + err.Error())
+		}
+		if affected != 1 {
+			_ = session.Rollback()
+			return errors.New("delete user'department fail, error number of user_role deleted-> expected: 1 , actual: " + string(affected))
+		}
 	}
 
 	return session.Commit()
@@ -153,8 +154,8 @@ func (dao *UserDao) UpdateUser(user *dataModel.User, roleId int, departmentId in
 	return session.Commit()
 }
 
-func (dao *UserDao) QueryUser(user *dataModel.User, departmentId int, roleId int, limitStart int, limitEnd int) ([]dataModel.User, error) {
-	var users = make([]dataModel.User, 0, 10)
+func (dao *UserDao) QueryUser(user *dataModel.User, departmentId int, roleId int, limitStart int, limitEnd int) ([]*dataModel.User, error) {
+	var users = make([]*dataModel.User, 0, 10)
 
 	var session = dao.EngineGroup.NewSession()
 	defer session.Close()
